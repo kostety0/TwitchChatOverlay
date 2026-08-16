@@ -1,0 +1,734 @@
+<Window x:Class="TwitchChatOverlay.UI.Settings.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:TwitchChatOverlay.UI.Localization"
+        xmlns:local="clr-namespace:TwitchChatOverlay.UI.Settings"
+        xmlns:vm="clr-namespace:TwitchChatOverlay.UI.Settings.ViewModels"
+        Title="{loc:Tr Window_Title}"
+        Width="760" Height="660"
+        MinWidth="660" MinHeight="500"
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        FontFamily="{StaticResource UiFontFamily}">
+
+    <Window.Resources>
+        <local:EnumToBooleanConverter x:Key="EnumToBool"/>
+        <local:InverseBooleanConverter x:Key="InverseBool"/>
+        <local:StringToVisibilityConverter x:Key="StringToVisibility"/>
+        <local:BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <local:ConnectionStateToBrushConverter x:Key="StateToBrush"/>
+        <local:HexToBrushConverter x:Key="HexToBrush"/>
+        <local:VoiceDisplayConverter x:Key="VoiceDisplay"/>
+        <local:ZeroToVisibilityConverter x:Key="ZeroToVisibility"/>
+
+        <!-- Tab icons: stroke geometry, one visual language (1.4px stroke, rounded caps).
+             Never emoji — they render differently per Windows build and ignore theming. -->
+        <Geometry x:Key="IconConnection">M3,12 L3,9.5 M6.5,12 L6.5,6.5 M10,12 L10,3.5 M13.5,12 L13.5,2.5</Geometry>
+        <Geometry x:Key="IconOverlay">M2,3 L14,3 L14,13 L2,13 Z M8,8 L12.5,8 L12.5,11.5 L8,11.5 Z</Geometry>
+        <Geometry x:Key="IconVoice">M3,6 L5.5,6 L9,3 L9,13 L5.5,10 L3,10 Z M11.5,6 A3,3 0 0 1 11.5,10</Geometry>
+        <Geometry x:Key="IconFilters">M2,3 L14,3 L9.5,8.5 L9.5,13 L6.5,11.5 L6.5,8.5 Z</Geometry>
+        <Geometry x:Key="IconQueue">M3,4 L13,4 M3,8 L13,8 M3,12 L9,12</Geometry>
+        <Geometry x:Key="IconHotkeys">M2,4 L14,4 L14,12 L2,12 Z M5,9.5 L11,9.5 M4.5,6.5 L4.6,6.5 M7,6.5 L7.1,6.5 M9.5,6.5 L9.6,6.5 M12,6.5 L12.1,6.5</Geometry>
+        <Geometry x:Key="IconGeneral">M8,5.5 A2.5,2.5 0 1 0 8,10.5 A2.5,2.5 0 1 0 8,5.5 M8,1.5 L8,3 M8,13 L8,14.5 M1.5,8 L3,8 M13,8 L14.5,8 M3.6,3.6 L4.7,4.7 M11.3,11.3 L12.4,12.4 M12.4,3.6 L11.3,4.7 M4.7,11.3 L3.6,12.4</Geometry>
+
+        <!-- Icon + label header; the icon inherits the tab's foreground so it follows
+             hover/selected states instead of staying a dead grey. -->
+        <Style x:Key="TabIcon" TargetType="Path">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.4"/>
+            <Setter Property="StrokeStartLineCap" Value="Round"/>
+            <Setter Property="StrokeEndLineCap" Value="Round"/>
+            <Setter Property="StrokeLineJoin" Value="Round"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+        </Style>
+
+        <Style x:Key="PageRoot" TargetType="StackPanel">
+            <Setter Property="Margin" Value="{StaticResource SpacingPagePadding}"/>
+        </Style>
+
+        <Style x:Key="FieldBlock" TargetType="StackPanel">
+            <Setter Property="Margin" Value="{StaticResource SpacingFieldGap}"/>
+        </Style>
+
+        <!-- One cell of the 3×3 anchor selector: a spatial picker beats a dropdown of
+             nine enum names, because the control mirrors the screen it configures. -->
+        <Style x:Key="AnchorCell" TargetType="RadioButton">
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Box"
+                                Width="46" Height="32"
+                                CornerRadius="{StaticResource RadiusSmall}"
+                                Background="{StaticResource SurfaceRaisedBrush}"
+                                BorderBrush="{StaticResource BorderStrongBrush}"
+                                BorderThickness="1">
+                            <Ellipse x:Name="Dot" Width="7" Height="7" Fill="{StaticResource TextDisabledBrush}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AccentTextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Dot" Property="Fill" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <TabControl>
+
+        <!-- ================= 1. Подключение ================= -->
+        <TabItem>
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconConnection}"/>
+                    <TextBlock Text="{loc:Tr Tab_Connection}"/>
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding Connection}" Style="{StaticResource PageRoot}">
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr Conn_ChannelName}" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Text="{Binding ChannelName, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"/>
+                        <TextBlock Text="{loc:Tr Conn_ChannelHint}" Style="{StaticResource HintText}"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr Conn_ClientId}" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Text="{Binding ClientId, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBlock Text="{loc:Tr Conn_ClientIdHint}" Style="{StaticResource HintText}"/>
+                        <Button Content="{loc:Tr Conn_OpenConsole}"
+                                Command="{Binding OpenDeveloperConsoleCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{loc:Tr Conn_Account}" Style="{StaticResource SectionHeaderText}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="{loc:Tr Conn_Login}"
+                                Command="{Binding LoginCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                MinWidth="170" Margin="0,0,10,0"
+                                IsEnabled="{Binding IsLoginInProgress, Converter={StaticResource InverseBool}}"/>
+                        <Button Content="{loc:Tr Conn_Logout}"
+                                Command="{Binding LogoutCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                MinWidth="110"
+                                IsEnabled="{Binding IsLoggedIn}"/>
+                    </StackPanel>
+
+                    <!-- Device Code Flow: the code is the one thing the user must read and
+                         retype, so it gets display-size type and its own surface. -->
+                    <Border Style="{StaticResource CardPanel}" Margin="0,14,0,0"
+                            BorderBrush="{StaticResource AccentBrush}"
+                            Visibility="{Binding DeviceCode, Converter={StaticResource StringToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="{loc:Tr Conn_DeviceCodeHint}" TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding DeviceCode}"
+                                       FontSize="{StaticResource FontSizeDisplay}" FontWeight="Bold"
+                                       Foreground="{StaticResource AccentTextBrush}" Margin="0,8,0,0"/>
+                            <TextBlock Text="{Binding DeviceVerificationUri}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                            <Button Content="{loc:Tr Conn_CopyCode}"
+                                    Command="{Binding CopyDeviceCodeCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="{Binding LoginError}" Style="{StaticResource ErrorTextStyle}"
+                               Visibility="{Binding LoginError, Converter={StaticResource StringToVisibility}}"/>
+
+                    <TextBlock Text="{loc:Tr Conn_Status}" Style="{StaticResource SectionHeaderText}"/>
+                    <Border Style="{StaticResource CardPanel}" Padding="14,12">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                                     Fill="{Binding ConnectionState, Converter={StaticResource StateToBrush}}"/>
+                            <TextBlock Text="{Binding StatusText}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 2. Оверлей ================= -->
+        <TabItem>
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconOverlay}"/>
+                    <TextBlock Text="{loc:Tr Tab_Overlay}"/>
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding Overlay}" Style="{StaticResource PageRoot}">
+
+                    <TextBlock Text="{loc:Tr Ov_Position}" Style="{StaticResource SectionHeaderText}" Margin="0,0,0,10"/>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr Ov_Monitor}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding Monitors}" SelectedItem="{Binding SelectedMonitor}"
+                                  DisplayMemberPath="DisplayName"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{loc:Tr Ov_Anchor}" Style="{StaticResource FieldLabelText}"/>
+                    <UniformGrid Rows="3" Columns="3" HorizontalAlignment="Left" Margin="0,8,0,0">
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=TopLeft}"/>
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=TopCenter}"/>
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=TopRight}"/>
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=MiddleLeft}"/>
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=MiddleCenter}"/>
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=MiddleRight}"/>
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=BottomLeft}"/>
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=BottomCenter}"/>
+                        <RadioButton Style="{StaticResource AnchorCell}" GroupName="Anchor"
+                                     IsChecked="{Binding Anchor, Converter={StaticResource EnumToBool}, ConverterParameter=BottomRight}"/>
+                    </UniformGrid>
+                    <TextBlock Text="{loc:Tr Ov_AnchorHint}" Style="{StaticResource HintText}" Margin="0,8,0,16"/>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_OffsetX}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding OffsetX, StringFormat={}{0} px}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="300" Value="{Binding OffsetX}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_OffsetY}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding OffsetY, StringFormat={}{0} px}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="300" Value="{Binding OffsetY}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <Button Content="{loc:Tr Ov_Preview}" Command="{Binding PreviewCommand}"
+                                Style="{StaticResource PrimaryButton}" MinWidth="140" Margin="0,0,10,0"/>
+                        <ToggleButton Content="{loc:Tr Ov_SetupMode}" IsChecked="{Binding IsSetupMode}"
+                                      Style="{StaticResource ToggleChipButton}" MinWidth="150"/>
+                    </StackPanel>
+                    <TextBlock Text="{loc:Tr Ov_SetupModeHint}" Style="{StaticResource HintText}"/>
+
+                    <TextBlock Text="{loc:Tr Ov_Appearance}" Style="{StaticResource SectionHeaderText}"/>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_CardWidth}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding CardWidth, StringFormat={}{0} px}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="200" Maximum="800" Value="{Binding CardWidth}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_UsernameFontSize}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding UsernameFontSize}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="8" Maximum="48" Value="{Binding UsernameFontSize}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_MessageFontSize}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding MessageFontSize}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="8" Maximum="48" Value="{Binding MessageFontSize}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr Ov_Font}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding SystemFonts}" SelectedItem="{Binding FontFamily}" MaxDropDownHeight="280"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr Ov_Background}" Style="{StaticResource FieldLabelText}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox Text="{Binding BackgroundColorHex, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                     Width="130"/>
+                            <Border Width="34" Height="34" Margin="10,6,0,0"
+                                    BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+                                    CornerRadius="{StaticResource RadiusSmall}"
+                                    Background="{Binding BackgroundColorHex, Converter={StaticResource HexToBrush}}"/>
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding ColorPresets}" Margin="0,10,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Width="30" Height="24" Margin="0,0,8,8"
+                                            Background="{Binding Converter={StaticResource HexToBrush}}"
+                                            BorderBrush="{StaticResource BorderStrongBrush}"
+                                            ToolTip="{Binding}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            MinHeight="24" Padding="0"
+                                            Command="{Binding DataContext.PickColorCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_Opacity}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding BackgroundOpacityPercent, StringFormat={}{0} %}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="100" Value="{Binding BackgroundOpacityPercent}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_CornerRadius}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding CornerRadius, StringFormat={}{0} px}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="30" Value="{Binding CornerRadius}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr Ov_Animation}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding Animations}" SelectedItem="{Binding SelectedAnimation}" DisplayMemberPath="DisplayName"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_AnimationDuration}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding AnimationDurationMs, StringFormat={}{0} мс}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="2000" Value="{Binding AnimationDurationMs}" IsSnapToTickEnabled="True" TickFrequency="10"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Ov_Tail}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding PostSpeechTailSeconds, StringFormat={}{0:0.0} с}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="5" Value="{Binding PostSpeechTailSeconds}" IsSnapToTickEnabled="True" TickFrequency="0.1"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{loc:Tr Ov_Content}" Style="{StaticResource SectionHeaderText}"/>
+                    <CheckBox Content="{loc:Tr Ov_ShowBadges}" IsChecked="{Binding ShowBadges}"/>
+                    <CheckBox Content="{loc:Tr Ov_ShowAvatar}" IsChecked="{Binding ShowAvatar}"/>
+                    <CheckBox Content="{loc:Tr Ov_UseNameColor}" IsChecked="{Binding UseTwitchNameColor}"/>
+                    <CheckBox Content="{loc:Tr Ov_ShowText}" IsChecked="{Binding ShowMessageText}"/>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 3. Голос ================= -->
+        <TabItem>
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconVoice}"/>
+                    <TextBlock Text="{loc:Tr Tab_Voice}"/>
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding Voice}" Style="{StaticResource PageRoot}">
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr V_Engine}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding Engines}" SelectedItem="{Binding SelectedEngine}" DisplayMemberPath="DisplayName"/>
+                    </StackPanel>
+
+                    <!-- Warning surface, not an error: the app still speaks, just via SAPI. -->
+                    <Border Style="{StaticResource CardPanel}" Margin="0,0,0,16"
+                            BorderBrush="{StaticResource WarningBrush}"
+                            Visibility="{Binding EngineNotice, Converter={StaticResource StringToVisibility}}">
+                        <TextBlock Text="{Binding EngineNotice}" TextWrapping="Wrap"
+                                   Foreground="{StaticResource WarningBrush}"/>
+                    </Border>
+
+                    <TextBlock Text="{loc:Tr V_Gender}" Style="{StaticResource FieldLabelText}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,10">
+                        <RadioButton Content="{loc:Tr V_Male}" GroupName="Gender" Margin="0,0,24,0"
+                                     IsChecked="{Binding Gender, Converter={StaticResource EnumToBool}, ConverterParameter=Male}"/>
+                        <RadioButton Content="{loc:Tr V_Female}" GroupName="Gender"
+                                     IsChecked="{Binding Gender, Converter={StaticResource EnumToBool}, ConverterParameter=Female}"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr V_Voice}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding AvailableVoices}" SelectedItem="{Binding SelectedVoice}" MaxDropDownHeight="280">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource VoiceDisplay}}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="{loc:Tr V_NoVoices}" Style="{StaticResource HintText}"
+                                   Visibility="{Binding AvailableVoices.Count, Converter={StaticResource ZeroToVisibility}}"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr V_Rate}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding Rate, StringFormat={}{0:0.0}×}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0.5" Maximum="2.0" Value="{Binding Rate}" IsSnapToTickEnabled="True" TickFrequency="0.1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr V_Pitch}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding Pitch}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="-10" Maximum="10" Value="{Binding Pitch}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr V_Volume}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding Volume, StringFormat={}{0} %}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr V_Device}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding OutputDevices}" SelectedItem="{Binding SelectedOutputDevice}" DisplayMemberPath="DisplayName"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="{loc:Tr V_Test}" Command="{Binding TestVoiceCommand}"
+                                Style="{StaticResource PrimaryButton}" MinWidth="160"
+                                IsEnabled="{Binding IsTesting, Converter={StaticResource InverseBool}}"/>
+                        <TextBlock Text="{loc:Tr V_Testing}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                   Foreground="{StaticResource AccentTextBrush}"
+                                   Visibility="{Binding IsTesting, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding TestError}" Style="{StaticResource ErrorTextStyle}"
+                               Visibility="{Binding TestError, Converter={StaticResource StringToVisibility}}"/>
+
+                    <StackPanel Style="{StaticResource FieldBlock}" Margin="0,18,0,16">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr V_Pause}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding PauseBetweenMessagesSeconds, StringFormat={}{0:0.0} с}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="3" Value="{Binding PauseBetweenMessagesSeconds}" IsSnapToTickEnabled="True" TickFrequency="0.1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr V_Template}" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Text="{Binding PronunciationTemplate, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBlock Text="{loc:Tr V_TemplateHint}" Style="{StaticResource HintText}"/>
+                    </StackPanel>
+
+                    <CheckBox Content="{loc:Tr V_DontReadName}" IsChecked="{Binding DontReadUsername}"/>
+
+                    <CheckBox Content="{loc:Tr V_Translit}" IsChecked="{Binding TransliterateUsernames}"/>
+                    <TextBlock Text="{loc:Tr V_TranslitHint}" Style="{StaticResource HintText}" Margin="28,-6,0,12"/>
+
+                    <CheckBox Content="{loc:Tr V_UniquePerViewer}" IsChecked="{Binding UniqueVoicePerViewer}"/>
+                    <TextBlock Text="{loc:Tr V_PoolHint}" Style="{StaticResource HintText}" Margin="28,-6,0,8"/>
+
+                    <!-- Progressive disclosure: the pool only matters once per-viewer voices are on. -->
+                    <StackPanel Margin="28,0,0,0"
+                                Visibility="{Binding UniqueVoicePerViewer, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{loc:Tr V_Pool}" Style="{StaticResource FieldLabelText}" Margin="0,4,0,8"/>
+                        <Border Style="{StaticResource CardPanel}" Padding="6">
+                            <ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding VoicePool}" Margin="8">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding DisplayName}" IsChecked="{Binding IsSelected}" Margin="0,0,0,2"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 4. Фильтры и доступ ================= -->
+        <TabItem>
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconFilters}"/>
+                    <TextBlock Text="{loc:Tr Tab_Filters}"/>
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding Filters}" Style="{StaticResource PageRoot}">
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr F_Access}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding AccessLevels}" SelectedItem="{Binding SelectedAccessLevel}" DisplayMemberPath="DisplayName"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}"
+                                Visibility="{Binding IsChannelPointsMode, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{loc:Tr F_Reward}" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Text="{Binding ChannelPointsRewardName, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr F_MaxLen}" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Text="{Binding MaxMessageLength, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                 Width="130" HorizontalAlignment="Left"/>
+                        <TextBlock Text="{loc:Tr F_MaxLenHint}" Style="{StaticResource HintText}"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr F_Cooldown}" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Text="{Binding UserCooldownSeconds, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                 Width="130" HorizontalAlignment="Left"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{loc:Tr F_Processing}" Style="{StaticResource SectionHeaderText}"/>
+                    <CheckBox Content="{loc:Tr F_StripLinks}" IsChecked="{Binding StripLinks}"/>
+                    <CheckBox Content="{loc:Tr F_StripEmotes}" IsChecked="{Binding StripEmotes}"/>
+                    <CheckBox Content="{loc:Tr F_IgnoreCommands}" IsChecked="{Binding IgnoreCommands}"/>
+                    <CheckBox Content="{loc:Tr F_Collapse}" IsChecked="{Binding CollapseRepeatedChars}"/>
+
+                    <StackPanel Style="{StaticResource FieldBlock}" Margin="0,14,0,16">
+                        <TextBlock Text="{loc:Tr F_WordBlacklist}" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Style="{StaticResource MultilineTextBox}"
+                                 Text="{Binding WordBlacklistText, UpdateSourceTrigger=LostFocus}" Height="96"/>
+                        <TextBlock Text="{loc:Tr F_BlacklistHint}" Style="{StaticResource HintText}"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr F_UserBlacklist}" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Style="{StaticResource MultilineTextBox}"
+                                 Text="{Binding UserBlacklistText, UpdateSourceTrigger=LostFocus}" Height="96"/>
+                        <TextBlock Text="{loc:Tr F_BlacklistHint}" Style="{StaticResource HintText}"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 5. Очередь ================= -->
+        <TabItem>
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconQueue}"/>
+                    <TextBlock Text="{loc:Tr Tab_Queue}"/>
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding Queue}" Style="{StaticResource PageRoot}">
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <DockPanel>
+                            <TextBlock Text="{loc:Tr Q_MaxSize}" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="{Binding MaxQueueSize}" Style="{StaticResource ValueLabelText}"/>
+                        </DockPanel>
+                        <Slider Minimum="1" Maximum="50" Value="{Binding MaxQueueSize}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel Style="{StaticResource FieldBlock}">
+                        <TextBlock Text="{loc:Tr Q_Overflow}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding OverflowPolicies}" SelectedItem="{Binding SelectedOverflowPolicy}" DisplayMemberPath="DisplayName"/>
+                    </StackPanel>
+
+                    <Border Style="{StaticResource CardPanel}" Margin="0,10,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox Content="{loc:Tr Q_SkipOld}" IsChecked="{Binding SkipOldMessages}"
+                                      VerticalAlignment="Center" Margin="0"/>
+                            <TextBox Text="{Binding SkipOlderThanSeconds, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                     Width="80" Margin="12,0,8,0" VerticalAlignment="Center"
+                                     IsEnabled="{Binding SkipOldMessages}"/>
+                            <TextBlock Text="{loc:Tr Unit_Sec}" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 6. Горячие клавиши ================= -->
+        <TabItem>
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconHotkeys}"/>
+                    <TextBlock Text="{loc:Tr Tab_Hotkeys}"/>
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding Hotkeys}" Style="{StaticResource PageRoot}">
+                    <TextBlock Text="{loc:Tr H_Hint}" Style="{StaticResource HintText}" Margin="0,0,0,16"/>
+
+                    <ItemsControl ItemsSource="{Binding Bindings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="190"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Label}" Style="{StaticResource FieldLabelText}"/>
+                                            <TextBlock Text="{Binding Error}" Style="{StaticResource ErrorTextStyle}"
+                                                       Visibility="{Binding Error, Converter={StaticResource StringToVisibility}}"/>
+                                        </StackPanel>
+
+                                        <!-- Recorded combination reads as a key cap. -->
+                                        <Border x:Name="KeyCap" Grid.Column="1" Margin="10,0"
+                                                Background="{StaticResource SurfaceRaisedBrush}"
+                                                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+                                                CornerRadius="{StaticResource RadiusSmall}"
+                                                Padding="10,6" VerticalAlignment="Center">
+                                            <TextBlock HorizontalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="{Binding GestureText}"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                                        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, monospace"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding GestureText}" Value="">
+                                                                <Setter Property="Text" Value="{loc:Tr H_NotSet}"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextDisabledBrush}"/>
+                                                                <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                                                <Setter Property="Text" Value="{loc:Tr H_Recording}"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                                <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+
+                                        <Button Grid.Column="2" Content="{loc:Tr H_Record}" Margin="0,0,8,0" MinWidth="90"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Command="{Binding DataContext.StartRecordingCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}"/>
+                                        <Button Grid.Column="3" Content="{loc:Tr H_Clear}" MinWidth="90"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Command="{Binding DataContext.ClearBindingCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}"/>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                        <Setter TargetName="KeyCap" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                        <Setter TargetName="KeyCap" Property="Background" Value="{StaticResource AccentMutedBrush}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 7. Общее ================= -->
+        <TabItem>
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconGeneral}"/>
+                    <TextBlock Text="{loc:Tr Tab_General}"/>
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding General}" Style="{StaticResource PageRoot}">
+
+                    <CheckBox Content="{loc:Tr G_Autostart}" IsChecked="{Binding StartWithWindows}"/>
+                    <CheckBox Content="{loc:Tr G_MinimizeToTray}" IsChecked="{Binding MinimizeToTrayOnClose}"/>
+                    <CheckBox Content="{loc:Tr G_StartMinimized}" IsChecked="{Binding StartMinimized}"/>
+
+                    <StackPanel Style="{StaticResource FieldBlock}" Margin="0,14,0,0">
+                        <TextBlock Text="{loc:Tr G_Language}" Style="{StaticResource FieldLabelText}"/>
+                        <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}"
+                                  DisplayMemberPath="DisplayName" Width="220" HorizontalAlignment="Left"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{loc:Tr G_Data}" Style="{StaticResource SectionHeaderText}"/>
+                    <WrapPanel>
+                        <Button Content="{loc:Tr G_OpenConfig}" Command="{Binding OpenConfigFolderCommand}"
+                                Style="{StaticResource SecondaryButton}" MinWidth="200" Margin="0,0,10,10"/>
+                        <Button Content="{loc:Tr G_Export}" Command="{Binding ExportSettingsCommand}"
+                                Style="{StaticResource SecondaryButton}" MinWidth="150" Margin="0,0,10,10"/>
+                        <Button Content="{loc:Tr G_Import}" Command="{Binding ImportSettingsCommand}"
+                                Style="{StaticResource SecondaryButton}" MinWidth="150" Margin="0,0,10,10"/>
+                    </WrapPanel>
+
+                    <!-- Destructive action kept out of the row above so it is not clicked by reflex. -->
+                    <Button Content="{loc:Tr G_Reset}" Command="{Binding ResetSettingsCommand}"
+                            Style="{StaticResource DangerButton}" MinWidth="200"
+                            HorizontalAlignment="Left" Margin="0,6,0,0"/>
+
+                    <TextBlock Text="{loc:Tr G_About}" Style="{StaticResource SectionHeaderText}"/>
+                    <Border Style="{StaticResource CardPanel}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Tr G_Version}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,6"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding VersionText}"
+                                       FontWeight="SemiBold" Margin="0,0,0,6"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Tr G_Author}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,6"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AuthorText}"
+                                       FontWeight="SemiBold" Margin="0,0,0,6"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CopyrightText}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:Tr G_SettingsFile}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,6"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SettingsFilePath}"
+                                       TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6"/>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Tr G_Repo}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,0"
+                                       Visibility="{Binding HasRepositoryLink, Converter={StaticResource BoolToVisibility}}"/>
+                            <Button Grid.Row="4" Grid.Column="1" Content="{x:Static vm:GeneralTabViewModel.RepositoryUrl}"
+                                    Command="{Binding OpenRepositoryCommand}"
+                                    HorizontalAlignment="Left" Padding="0" BorderThickness="0" Background="Transparent"
+                                    Foreground="{StaticResource AccentTextBrush}" Cursor="Hand" MinHeight="0"
+                                    Visibility="{Binding HasRepositoryLink, Converter={StaticResource BoolToVisibility}}"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+    </TabControl>
+</Window>

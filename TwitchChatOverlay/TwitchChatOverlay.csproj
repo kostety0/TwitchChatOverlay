@@ -1,0 +1,53 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\icons\tray.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <AssemblyName>TwitchChatOverlay</AssemblyName>
+    <RootNamespace>TwitchChatOverlay</RootNamespace>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!-- Version and authorship. These feed three places at once: the Windows file-properties
+       dialog, the assembly attributes the About section reads at runtime, and the tray tooltip. -->
+  <PropertyGroup>
+    <Version>1.0.3</Version>
+    <AssemblyVersion>1.0.3.0</AssemblyVersion>
+    <FileVersion>1.0.3.0</FileVersion>
+    <InformationalVersion>1.0.3</InformationalVersion>
+    <Authors>KoT Z</Authors>
+    <Company>KoT Z</Company>
+    <Product>TwitchChatOverlay</Product>
+    <AssemblyTitle>TwitchChatOverlay</AssemblyTitle>
+    <Description>Оверлей чата Twitch с озвучиванием сообщений</Description>
+    <Copyright>© 2026 KoT Z</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
+    <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.11" />
+    <PackageReference Include="System.Speech" Version="10.0.11" />
+    <PackageReference Include="TwitchLib.EventSub.Websockets" Version="0.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copied next to the exe rather than embedded: TrayIconService loads the .ico from
+         disk at AppContext.BaseDirectory, and an embedded WPF Resource is not a file. -->
+    <Content Include="Resources\icons\tray.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

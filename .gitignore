@@ -1,0 +1,26 @@
+# ── Сборка ──────────────────────────────────────────────────────────
+bin/
+obj/
+publish/
+publish-standalone/
+build-tmp/
+*.user
+*.suo
+
+# ── Piper и модели голосов ──────────────────────────────────────────
+# Сотни мегабайт, распространяются под своими лицензиями и
+# устанавливаются пользователем самостоятельно (см. README в этих папках).
+TwitchChatOverlay/Resources/piper/*
+!TwitchChatOverlay/Resources/piper/README.md
+TwitchChatOverlay/Resources/voices/*
+!TwitchChatOverlay/Resources/voices/README.md
+
+# ── Среды разработки ───────────────────────────────────────────────
+.vs/
+.idea/
+*.swp
+
+# ── ОС ─────────────────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
