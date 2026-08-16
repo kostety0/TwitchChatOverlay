@@ -22,12 +22,12 @@
     <AssemblyVersion>1.0.3.0</AssemblyVersion>
     <FileVersion>1.0.3.0</FileVersion>
     <InformationalVersion>1.0.3</InformationalVersion>
-    <Authors>KoT Z</Authors>
-    <Company>KoT Z</Company>
+    <Authors>Kostety0</Authors>
+    <Company>Kostety0</Company>
     <Product>TwitchChatOverlay</Product>
     <AssemblyTitle>TwitchChatOverlay</AssemblyTitle>
     <Description>Оверлей чата Twitch с озвучиванием сообщений</Description>
-    <Copyright>© 2026 KoT Z</Copyright>
+    <Copyright>© 2026 Kostety0</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
