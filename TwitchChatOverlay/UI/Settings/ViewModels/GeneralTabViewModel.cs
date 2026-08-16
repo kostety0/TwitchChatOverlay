@@ -17,9 +17,9 @@ public sealed partial class GeneralTabViewModel : SettingsTabViewModel
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValueName = "TwitchChatOverlay";
 
-    /// <summary>Left empty on purpose: filled in with the real URL when the project gets
-    /// published. The row stays hidden while it is blank rather than showing a dead link.</summary>
-    public const string RepositoryUrl = "";
+    /// <summary>The About row stays hidden while this is blank, so a build without a public
+    /// home never shows a dead link.</summary>
+    public const string RepositoryUrl = "https://github.com/kostety0/TwitchChatOverlay";
 
     private readonly IUserDialogs _dialogs;
     private readonly ILogger<GeneralTabViewModel> _logger;

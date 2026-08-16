@@ -1,4 +1,4 @@
-<Window x:Class="TwitchChatOverlay.UI.Settings.SettingsWindow"
+﻿<Window x:Class="TwitchChatOverlay.UI.Settings.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:TwitchChatOverlay.UI.Localization"
@@ -94,7 +94,7 @@
     <TabControl>
 
         <!-- ================= 1. Подключение ================= -->
-        <TabItem>
+        <TabItem AutomationProperties.Name="{loc:Tr Tab_Connection}">
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconConnection}"/>
@@ -170,7 +170,7 @@
         </TabItem>
 
         <!-- ================= 2. Оверлей ================= -->
-        <TabItem>
+        <TabItem AutomationProperties.Name="{loc:Tr Tab_Overlay}">
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconOverlay}"/>
@@ -342,7 +342,7 @@
         </TabItem>
 
         <!-- ================= 3. Голос ================= -->
-        <TabItem>
+        <TabItem AutomationProperties.Name="{loc:Tr Tab_Voice}">
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconVoice}"/>
@@ -469,7 +469,7 @@
         </TabItem>
 
         <!-- ================= 4. Фильтры и доступ ================= -->
-        <TabItem>
+        <TabItem AutomationProperties.Name="{loc:Tr Tab_Filters}">
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconFilters}"/>
@@ -527,7 +527,7 @@
         </TabItem>
 
         <!-- ================= 5. Очередь ================= -->
-        <TabItem>
+        <TabItem AutomationProperties.Name="{loc:Tr Tab_Queue}">
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconQueue}"/>
@@ -566,7 +566,7 @@
         </TabItem>
 
         <!-- ================= 6. Горячие клавиши ================= -->
-        <TabItem>
+        <TabItem AutomationProperties.Name="{loc:Tr Tab_Hotkeys}">
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconHotkeys}"/>
@@ -649,7 +649,7 @@
         </TabItem>
 
         <!-- ================= 7. Общее ================= -->
-        <TabItem>
+        <TabItem AutomationProperties.Name="{loc:Tr Tab_General}">
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <Path Style="{StaticResource TabIcon}" Data="{StaticResource IconGeneral}"/>
