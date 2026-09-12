@@ -47,7 +47,7 @@ public sealed class SettingsService
             if (!File.Exists(SettingsFilePath))
             {
                 Current = new AppSettings();
-                await WriteToDiskAsync(ct);
+                await WriteToDiskAsync();
                 return;
             }
 
@@ -77,7 +77,7 @@ public sealed class SettingsService
         try
         {
             Current = settings;
-            await WriteToDiskAsync(ct);
+            await WriteToDiskAsync();
         }
         finally
         {
@@ -109,10 +109,20 @@ public sealed class SettingsService
 
     public async Task SaveAsync(CancellationToken ct = default)
     {
-        await _fileLock.WaitAsync(ct);
+        // Сохранение намеренно не зависит от переданного токена отмены: раньше запись
+        // отменялась вместе с той операцией, которая её вызвала (например, повторное
+        // нажатие «Войти» отменяло сохранение только что полученного токена), и настройки
+        // молча оставались только в памяти.
+        await _fileLock.WaitAsync(CancellationToken.None);
         try
         {
-            await WriteToDiskAsync(ct);
+            await WriteToDiskAsync();
+            _logger.LogInformation("Настройки сохранены в {Path}", SettingsFilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Не удалось сохранить настройки в {Path}", SettingsFilePath);
+            throw;
         }
         finally
         {
@@ -122,12 +132,12 @@ public sealed class SettingsService
         SettingsChanged?.Invoke(this, Current);
     }
 
-    private async Task WriteToDiskAsync(CancellationToken ct)
+    private async Task WriteToDiskAsync()
     {
         var tempPath = SettingsFilePath + ".tmp";
         await using (var stream = File.Create(tempPath))
         {
-            await JsonSerializer.SerializeAsync(stream, Current, _jsonOptions, ct);
+            await JsonSerializer.SerializeAsync(stream, Current, _jsonOptions);
         }
         File.Move(tempPath, SettingsFilePath, overwrite: true);
     }

@@ -43,12 +43,9 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
     [ObservableProperty]
     private bool _isLoginInProgress;
 
-    /// <summary>Device Code Flow prompt shown while the user authorizes in the browser.</summary>
+    /// <summary>Shown while the browser tab is open and we are waiting for Twitch to redirect back.</summary>
     [ObservableProperty]
-    private string? _deviceCode;
-
-    [ObservableProperty]
-    private string? _deviceVerificationUri;
+    private bool _isWaitingForBrowser;
 
     [ObservableProperty]
     private string? _loginError;
@@ -142,11 +139,9 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
 
         try
         {
-            var (prompt, completion) = await _authService.StartDeviceCodeFlowAsync(_loginCts.Token);
-            DeviceCode = prompt.UserCode;
-            DeviceVerificationUri = prompt.VerificationUri;
-
-            OpenBrowser(prompt.VerificationUri);
+            var (authorizeUrl, completion) = _authService.StartSignIn(_loginCts.Token);
+            IsWaitingForBrowser = true;
+            OpenBrowser(authorizeUrl);
 
             var success = await completion;
             if (success)
@@ -172,8 +167,7 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
         finally
         {
             IsLoginInProgress = false;
-            DeviceCode = null;
-            DeviceVerificationUri = null;
+            IsWaitingForBrowser = false;
         }
     }
 
@@ -197,22 +191,6 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
 
     [RelayCommand]
     private void OpenDeveloperConsole() => OpenBrowser("https://dev.twitch.tv/console/apps");
-
-    [RelayCommand]
-    private void CopyDeviceCode()
-    {
-        if (!string.IsNullOrEmpty(DeviceCode))
-        {
-            try
-            {
-                System.Windows.Clipboard.SetText(DeviceCode);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Не удалось скопировать код в буфер обмена");
-            }
-        }
-    }
 
     private void RestartChatClient()
     {
