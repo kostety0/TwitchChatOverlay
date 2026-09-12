@@ -134,16 +134,20 @@
                                 IsEnabled="{Binding IsLoggedIn}"/>
                     </StackPanel>
 
-                    <!-- Больше никакого кода для ручного ввода: браузер возвращает ответ
-                         приложению сам, здесь остаётся только индикатор ожидания. -->
+                    <!-- Код — единственное, что пользователь должен прочитать и перенести,
+                         поэтому он набран крупно и вынесен на отдельную подложку.
+                         При исправно работающем обновлении токена это делается один раз. -->
                     <Border Style="{StaticResource CardPanel}" Margin="0,14,0,0"
                             BorderBrush="{StaticResource AccentBrush}"
-                            Visibility="{Binding IsWaitingForBrowser, Converter={StaticResource BoolToVisibility}}">
+                            Visibility="{Binding DeviceCode, Converter={StaticResource StringToVisibility}}">
                         <StackPanel>
-                            <TextBlock Text="{loc:Tr Conn_WaitingBrowser}" TextWrapping="Wrap"
-                                       FontWeight="SemiBold" Foreground="{StaticResource AccentTextBrush}"/>
-                            <TextBlock Text="{loc:Tr Conn_WaitingBrowserHint}" TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,6,0,0"/>
+                            <TextBlock Text="{loc:Tr Conn_DeviceCodeHint}" TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding DeviceCode}"
+                                       FontSize="{StaticResource FontSizeDisplay}" FontWeight="Bold"
+                                       Foreground="{StaticResource AccentTextBrush}" Margin="0,8,0,0"/>
+                            <TextBlock Text="{Binding DeviceVerificationUri}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </Border>
 

@@ -43,9 +43,12 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
     [ObservableProperty]
     private bool _isLoginInProgress;
 
-    /// <summary>Shown while the browser tab is open and we are waiting for Twitch to redirect back.</summary>
+    /// <summary>Device Code Flow prompt shown while the user authorizes in the browser.</summary>
     [ObservableProperty]
-    private bool _isWaitingForBrowser;
+    private string? _deviceCode;
+
+    [ObservableProperty]
+    private string? _deviceVerificationUri;
 
     [ObservableProperty]
     private string? _loginError;
@@ -97,7 +100,23 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
 
     partial void OnClientIdChanged(string value) => Apply(nameof(ClientId), () =>
     {
-        Settings.Connection.ClientId = value.Trim();
+        var trimmed = value.Trim();
+        var changed = !string.Equals(Settings.Connection.ClientId, trimmed, StringComparison.Ordinal);
+        Settings.Connection.ClientId = trimmed;
+
+        // Токен выдан конкретным приложением Twitch: после смены Client ID он заведомо
+        // непригоден, и попытка им воспользоваться даёт лишь невнятную ошибку. Чистим сразу,
+        // чтобы пользователю не приходилось догадываться нажать «Выйти».
+        if (changed && IsLoggedIn)
+        {
+            Settings.Connection.ProtectedAccessToken = null;
+            Settings.Connection.ProtectedRefreshToken = null;
+            Settings.Connection.TokenExpiresAt = null;
+            Settings.Connection.TwitchUserId = string.Empty;
+            Settings.Connection.TwitchLogin = string.Empty;
+            IsLoggedIn = false;
+            _logger.LogInformation("Client ID изменён — сохранённый токен сброшен");
+        }
     });
 
     private void OnStatusChanged(object? sender, ConnectionStatus status)
@@ -139,9 +158,10 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
 
         try
         {
-            var (authorizeUrl, completion) = _authService.StartSignIn(_loginCts.Token);
-            IsWaitingForBrowser = true;
-            OpenBrowser(authorizeUrl);
+            var (prompt, completion) = await _authService.StartDeviceCodeFlowAsync(_loginCts.Token);
+            DeviceCode = prompt.UserCode;
+            DeviceVerificationUri = prompt.VerificationUri;
+            OpenBrowser(prompt.VerificationUri);
 
             var success = await completion;
             if (success)
@@ -152,7 +172,11 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
             }
             else
             {
-                LoginError = "Авторизация не завершена. Попробуйте ещё раз.";
+                // Настоящую причину Twitch пишет в тело ответа, и раньше она оставалась
+                // только в журнале — пользователь видел безликое «попробуйте ещё раз».
+                LoginError = _authService.LastAuthError is { Length: > 0 } detail
+                    ? $"Авторизация не завершена. Ответ Twitch: {detail}"
+                    : "Авторизация не завершена. Попробуйте ещё раз.";
             }
         }
         catch (OperationCanceledException)
@@ -167,7 +191,8 @@ public sealed partial class ConnectionTabViewModel : SettingsTabViewModel, IDisp
         finally
         {
             IsLoginInProgress = false;
-            IsWaitingForBrowser = false;
+            DeviceCode = null;
+            DeviceVerificationUri = null;
         }
     }
 

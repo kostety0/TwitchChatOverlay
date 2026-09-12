@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
@@ -7,6 +7,8 @@ using Microsoft.Extensions.Logging;
 using TwitchChatOverlay.Core.Settings;
 
 namespace TwitchChatOverlay.Core.Twitch;
+
+public sealed record DeviceCodePrompt(string UserCode, string VerificationUri, int ExpiresInSeconds);
 
 public sealed class TwitchAuthService
 {
@@ -20,16 +22,6 @@ public sealed class TwitchAuthService
 
     private const string RequiredScopes = "user:read:chat channel:read:redemptions";
 
-    /// <summary>
-    /// Port the app listens on while the browser completes sign-in. A fixed port is required
-    /// because Twitch matches redirect_uri exactly against the value registered in the
-    /// developer console — it cannot be chosen at random per run.
-    /// </summary>
-    public const int CallbackPort = 47990;
-
-    public static string RedirectUri => $"http://localhost:{CallbackPort}/";
-
-    private static readonly TimeSpan SignInTimeout = TimeSpan.FromMinutes(5);
 
     private static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(30);
     /// <summary>Refresh this early so a long synthesis/playback cycle never runs into a dead token.</summary>
@@ -60,167 +52,95 @@ public sealed class TwitchAuthService
 
     public bool IsLoggedIn => TokenProtector.Unprotect(_settingsService.Current.Connection.ProtectedAccessToken) is not null;
 
+    /// <summary>Текст последней ошибки от Twitch — чтобы окно показало причину, а не «попробуйте ещё раз».</summary>
+    public string? LastAuthError { get; private set; }
+
     /// <summary>
-    /// Starts Authorization Code Flow. Returns the URL to open in the browser and a task that
-    /// completes once Twitch redirects back to the local listener.
+    /// Starts Device Code Flow: returns the code/URL to show the user, and a task that
+    /// completes once they finish authorizing in the browser (or the code expires).
     ///
-    /// This replaced Device Code Flow, where the user had to retype an 8-character code on
-    /// twitch.tv for every sign-in. Here the browser returns the authorization code straight
-    /// to the app, so signing in is a single "Authorize" click.
+    /// Authorization Code Flow is deliberately NOT used: Twitch requires a client_secret for
+    /// it ("client_secret: Yes" in the token request) and does not support PKCE, so a desktop
+    /// app that cannot keep a secret has no way to use it. Twitch's own guidance for open
+    /// platforms such as Windows is a public client with this flow, which needs no secret and
+    /// still returns a refresh token — so the code only has to be entered once, ever.
     /// </summary>
-    public (string AuthorizeUrl, Task<bool> Completion) StartSignIn(CancellationToken ct)
+    public async Task<(DeviceCodePrompt Prompt, Task<bool> Completion)> StartDeviceCodeFlowAsync(CancellationToken ct)
     {
         if (!HasClientId)
         {
             throw new InvalidOperationException("Не задан Client ID приложения Twitch.");
         }
 
-        // state ties the browser response back to this request and is what makes a forged
-        // callback from another page harmless.
-        var state = Guid.NewGuid().ToString("N");
-
-        var url = "https://id.twitch.tv/oauth2/authorize" +
-                  "?response_type=code" +
-                  $"&client_id={Uri.EscapeDataString(ClientId)}" +
-                  $"&redirect_uri={Uri.EscapeDataString(RedirectUri)}" +
-                  $"&scope={Uri.EscapeDataString(RequiredScopes)}" +
-                  $"&state={state}";
-
-        return (url, WaitForCallbackAsync(state, ct));
-    }
-
-    private async Task<bool> WaitForCallbackAsync(string expectedState, CancellationToken ct)
-    {
-        using var listener = new HttpListener();
-        listener.Prefixes.Add(RedirectUri);
-
-        try
-        {
-            listener.Start();
-        }
-        catch (HttpListenerException ex)
-        {
-            _logger.LogError(ex, "Не удалось занять локальный порт {Port} для приёма ответа Twitch", CallbackPort);
-            throw new InvalidOperationException(
-                $"Не удалось открыть локальный порт {CallbackPort}. Возможно, его занимает другая программа.", ex);
-        }
-
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(SignInTimeout);
-
-        try
-        {
-            while (!timeout.IsCancellationRequested)
-            {
-                var contextTask = listener.GetContextAsync();
-                var finished = await Task.WhenAny(contextTask, Task.Delay(Timeout.Infinite, timeout.Token));
-                if (finished != contextTask)
-                {
-                    _logger.LogWarning("Ожидание ответа Twitch прервано или истекло");
-                    return false;
-                }
-
-                var context = await contextTask;
-                var query = context.Request.QueryString;
-                var code = query["code"];
-                var state = query["state"];
-                var error = query["error"];
-
-                if (!string.IsNullOrEmpty(error))
-                {
-                    var description = query["error_description"] ?? error;
-                    _logger.LogWarning("Twitch отклонил авторизацию: {Error}", description);
-                    await RespondAsync(context, "Вход не выполнен", description, success: false);
-                    return false;
-                }
-
-                if (string.IsNullOrEmpty(code))
-                {
-                    // Браузер попутно просит favicon.ico и подобное — это не ответ Twitch.
-                    context.Response.StatusCode = 404;
-                    context.Response.Close();
-                    continue;
-                }
-
-                if (!string.Equals(state, expectedState, StringComparison.Ordinal))
-                {
-                    _logger.LogWarning("Получен ответ с несовпадающим state — запрос отклонён");
-                    await RespondAsync(context, "Вход не выполнен", "Ответ не соответствует запросу.", success: false);
-                    return false;
-                }
-
-                var ok = await ExchangeCodeAsync(code, ct);
-                await RespondAsync(
-                    context,
-                    ok ? "Готово" : "Вход не выполнен",
-                    ok ? "Вернитесь в TwitchChatOverlay — окно браузера можно закрыть." : "Не удалось обменять код на токен. Подробности в журнале приложения.",
-                    ok);
-                return ok;
-            }
-
-            return false;
-        }
-        finally
-        {
-            listener.Stop();
-        }
-    }
-
-    private async Task<bool> ExchangeCodeAsync(string code, CancellationToken ct)
-    {
         using var http = CreateHttp();
-        var body = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["client_id"] = ClientId,
-            ["code"] = code,
-            ["grant_type"] = "authorization_code",
-            // Twitch требует, чтобы redirect_uri здесь совпадал с тем, что был в /authorize.
-            ["redirect_uri"] = RedirectUri
-        });
+        var response = await http.PostAsync(
+            $"https://id.twitch.tv/oauth2/device?client_id={Uri.EscapeDataString(ClientId)}&scopes={Uri.EscapeDataString(RequiredScopes)}",
+            content: null,
+            ct);
 
-        var response = await http.PostAsync("https://id.twitch.tv/oauth2/token", body, ct);
         if (!response.IsSuccessStatusCode)
         {
             var detail = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogWarning("Не удалось обменять код на токен: {Status}. Ответ Twitch: {Detail}",
-                response.StatusCode, detail);
-            return false;
+            _logger.LogWarning("Twitch отклонил запрос кода: {Status}. Ответ: {Detail}", response.StatusCode, detail);
+            throw new InvalidOperationException($"Twitch отклонил запрос кода: {detail}");
         }
 
-        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: ct);
-        if (token is null)
-        {
-            return false;
-        }
+        var device = await response.Content.ReadFromJsonAsync<DeviceCodeResponse>(cancellationToken: ct)
+                     ?? throw new InvalidOperationException("Twitch вернул пустой ответ на запрос device code.");
 
-        await StoreTokensAsync(token, ct);
-        await FetchAndStoreUserIdentityAsync(ct);
-
-        _logger.LogInformation("Авторизация Twitch выполнена успешно, refresh token {State}",
-            string.IsNullOrEmpty(token.RefreshToken) ? "НЕ получен" : "получен");
-        return true;
+        var prompt = new DeviceCodePrompt(device.UserCode, device.VerificationUri, device.ExpiresIn);
+        return (prompt, PollForTokenAsync(device, ct));
     }
 
-    private static async Task RespondAsync(HttpListenerContext context, string title, string message, bool success)
+    private async Task<bool> PollForTokenAsync(DeviceCodeResponse device, CancellationToken ct)
     {
-        var accent = success ? "#3FB950" : "#F85149";
-        var html = $"""
-            <!doctype html>
-            <html lang="ru"><head><meta charset="utf-8"><title>{title}</title></head>
-            <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;
-                         background:#0E0E14;color:#F2F2F7;font-family:Segoe UI,system-ui,sans-serif">
-              <div style="text-align:center;max-width:30rem;padding:2rem">
-                <div style="font-size:1.6rem;font-weight:600;color:{accent};margin-bottom:.75rem">{title}</div>
-                <div style="color:#9A9AAE;line-height:1.5">{message}</div>
-              </div>
-            </body></html>
-            """;
+        var interval = TimeSpan.FromSeconds(Math.Max(device.Interval, 1));
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(device.ExpiresIn);
 
-        var bytes = Encoding.UTF8.GetBytes(html);
-        context.Response.ContentType = "text/html; charset=utf-8";
-        context.Response.ContentLength64 = bytes.Length;
-        await context.Response.OutputStream.WriteAsync(bytes);
-        context.Response.Close();
+        using var http = CreateHttp();
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            await Task.Delay(interval, ct);
+
+            var body = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["client_id"] = ClientId,
+                ["device_code"] = device.DeviceCode,
+                ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code"
+            });
+
+            var response = await http.PostAsync("https://id.twitch.tv/oauth2/token", body, ct);
+            if (response.IsSuccessStatusCode)
+            {
+                var token = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: ct);
+                if (token is null)
+                {
+                    return false;
+                }
+
+                await StoreTokensAsync(token, ct);
+                await FetchAndStoreUserIdentityAsync(ct);
+
+                // Наличие refresh token решает, придётся ли вводить код ещё раз: без него
+                // доступ умрёт через четыре часа.
+                _logger.LogInformation("Авторизация Twitch выполнена успешно, refresh token {State}",
+                    string.IsNullOrEmpty(token.RefreshToken) ? "НЕ получен" : "получен");
+                return true;
+            }
+
+            // "authorization_pending" is the normal case while the user is still in the browser.
+            var error = await response.Content.ReadAsStringAsync(ct);
+            if (!error.Contains("authorization_pending", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Device Code Flow прерван, ответ Twitch: {Error}", error);
+                LastAuthError = ExtractMessage(error);
+                return false;
+            }
+        }
+
+        _logger.LogWarning("Срок действия кода авторизации истёк");
+        return false;
     }
 
     /// <summary>
@@ -358,12 +278,38 @@ public sealed class TwitchAuthService
         await _settingsService.SaveAsync(ct);
     }
 
+    /// <summary>Достаёт поле message из ответа Twitch; при неудаче отдаёт ответ как есть.</summary>
+    private static string ExtractMessage(string body)
+    {
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(body);
+            if (document.RootElement.TryGetProperty("message", out var message))
+            {
+                return message.GetString() ?? body;
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // не JSON — покажем как есть
+        }
+
+        return body;
+    }
+
     private HttpClient CreateHttp()
     {
         var http = _httpClientFactory.CreateClient();
         http.Timeout = HttpTimeout;
         return http;
     }
+
+    private sealed record DeviceCodeResponse(
+        [property: JsonPropertyName("device_code")] string DeviceCode,
+        [property: JsonPropertyName("user_code")] string UserCode,
+        [property: JsonPropertyName("verification_uri")] string VerificationUri,
+        [property: JsonPropertyName("expires_in")] int ExpiresIn,
+        [property: JsonPropertyName("interval")] int Interval);
 
     private sealed record TokenResponse(
         [property: JsonPropertyName("access_token")] string AccessToken,

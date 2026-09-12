@@ -1,4 +1,4 @@
-namespace TwitchChatOverlay.UI.Localization;
+﻿namespace TwitchChatOverlay.UI.Localization;
 
 /// <summary>String tables for the settings UI. Keys are grouped by tab prefix.</summary>
 internal static class LocalizedStrings
@@ -17,13 +17,12 @@ internal static class LocalizedStrings
         ["Conn_ChannelName"] = "Имя канала",
         ["Conn_ChannelHint"] = "Канал, чат которого читаем. Обычно совпадает с вашим логином на Twitch.",
         ["Conn_ClientId"] = "Client ID приложения Twitch",
-        ["Conn_ClientIdHint"] = "Создайте приложение в консоли разработчика Twitch, укажите в нём OAuth Redirect URL http://localhost:47990/ и тип клиента Public, затем вставьте сюда Client ID.",
+        ["Conn_ClientIdHint"] = "Создайте приложение в консоли разработчика Twitch и обязательно выберите тип клиента «виден всем» (Public) — иначе доступ будет обрываться каждые 4 часа. OAuth Redirect URL: http://localhost. Client ID вставьте сюда.",
         ["Conn_OpenConsole"] = "Открыть консоль разработчика",
         ["Conn_Login"] = "Войти через Twitch",
         ["Conn_Logout"] = "Выйти",
         ["Conn_Status"] = "Состояние",
-        ["Conn_WaitingBrowser"] = "Ожидание подтверждения в браузере…",
-        ["Conn_WaitingBrowserHint"] = "В открывшемся окне Twitch нажмите «Authorize». Вводить код больше не нужно — приложение получит ответ само.",
+        ["Conn_DeviceCodeHint"] = "Введите этот код на открывшейся странице Twitch. Если приложение публичное, сделать это нужно один раз — дальше доступ продлевается сам:",
         ["Conn_Account"] = "Аккаунт",
         ["Conn_LoggedIn"] = "Выполнен вход",
         ["Conn_NotLoggedIn"] = "Вход не выполнен",
@@ -141,13 +140,12 @@ internal static class LocalizedStrings
         ["Conn_ChannelName"] = "Channel name",
         ["Conn_ChannelHint"] = "The channel whose chat is read. Usually the same as your Twitch login.",
         ["Conn_ClientId"] = "Twitch application Client ID",
-        ["Conn_ClientIdHint"] = "Create an app in the Twitch developer console, set its OAuth Redirect URL to http://localhost:47990/ and Client Type to Public, then paste the Client ID here.",
+        ["Conn_ClientIdHint"] = "Create an app in the Twitch developer console and be sure to pick Client Type \"Public\" — otherwise access breaks every 4 hours. OAuth Redirect URL: http://localhost. Paste the Client ID here.",
         ["Conn_OpenConsole"] = "Open developer console",
         ["Conn_Login"] = "Sign in with Twitch",
         ["Conn_Logout"] = "Sign out",
         ["Conn_Status"] = "Status",
-        ["Conn_WaitingBrowser"] = "Waiting for confirmation in the browser…",
-        ["Conn_WaitingBrowserHint"] = "Click \"Authorize\" in the Twitch window that just opened. No code to type — the app receives the answer itself.",
+        ["Conn_DeviceCodeHint"] = "Enter this code on the Twitch page that just opened. With a public app this is a one-time step — access renews itself afterwards:",
         ["Conn_Account"] = "Account",
         ["Conn_LoggedIn"] = "Signed in",
         ["Conn_NotLoggedIn"] = "Not signed in",
